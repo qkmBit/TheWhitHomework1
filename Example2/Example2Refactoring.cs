@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,12 +9,28 @@ using System.IO.Compression;
 
 namespace whites
 {
-    class Program
+    class DefaultFile
     {
-        static string FileRead(string path)
+        string nameWithoutUUID;
+        FileInfo file;
+        bool needToDelete;
+
+        public FileInfo File { get => file; set => file = value; }
+        public string NameWithoutUUID { get => nameWithoutUUID; set => nameWithoutUUID = value; }
+        public bool NeedToDelete { get => needToDelete; set => needToDelete = value; }
+
+        public DefaultFile(FileInfo File)
         {
+            this.File = File;
+            Regex regex = new Regex(@" \w{8}-\w{4}-\w{4}-\w{4}-\w{12}");
+            NameWithoutUUID = regex.Replace(this.File.Name, "");
+        }
+
+        public string FileRead()
+        {
+            string path = file.FullName;
             string txt;
-            using (FileStream fstream = File.OpenRead(path))
+            using (FileStream fstream = System.IO.File.OpenRead(path))
             {
                 byte[] vs = new byte[fstream.Length];
                 fstream.Read(vs, 0, vs.Length);
@@ -22,23 +38,195 @@ namespace whites
             }
             return txt;
         }
-        static void DirectoryRename(string path, string name, DirectoryInfo directory1,DirectoryInfo directory2)
+        public void FileRename()
         {
-            int p = 1;
-            if (Directory.Exists(path + "\\" + name) == false)
-                directory1.MoveTo(path + "\\" + name);
-            while (true)
+            if (NeedToDelete == false)
             {
-                name = name + "(" + p + ")";
-                if (Directory.Exists(path + "\\" + name))
-                    p++;
-                else
+                int p = 1;
+                while (true)
                 {
-                    directory2.MoveTo(path + "\\" + name);
-                    break;
+                    string filename;
+                    string[] FileAndItsExtension = NameWithoutUUID.Split('.');
+                    filename = FileAndItsExtension[0];
+                    for (int j = 1; j < FileAndItsExtension.Length - 2; j++)
+                    {
+                        filename = filename + " " + FileAndItsExtension[j];
+                    }
+                    if(System.IO.File.Exists(File.Directory+ "\\" + NameWithoutUUID)==false)
+                    {
+                        File.MoveTo(File.Directory + "\\" + NameWithoutUUID);
+                        break;
+                    }
+                    filename = filename + " (" + p + ")." + FileAndItsExtension[FileAndItsExtension.Length - 1];
+                    if (System.IO.File.Exists(File.Directory + "\\" + filename))
+                        p++;
+                    else
+                    {
+                        File.MoveTo(File.Directory + "\\" + filename);
+                        break;
+                    }
                 }
             }
+            else
+                file.Delete();
         }
+    }
+    class MainDirectory
+    {
+        DirectoryInfo directory;
+        DefaultFile[] files;
+        DefaultDirectory[] directories;
+        public MainDirectory(DirectoryInfo Directory)
+        {
+            this.Directory = Directory;
+            files = GetFiles(Directory);
+            directories = GetDirectories(Directory);
+        }
+        public DefaultFile[] GetFiles(DirectoryInfo directory)
+        {
+            FileInfo[] files = directory.GetFiles();
+            DefaultFile[] defaultFiles = new DefaultFile[files.Length];
+            for (int i = 0; i < files.Length; i++)
+            {
+                defaultFiles[i] = new DefaultFile(files[i]);
+            }
+            return defaultFiles;
+        }
+        public DefaultDirectory[] GetDirectories(DirectoryInfo directory)
+        {
+            DirectoryInfo[] directories = directory.GetDirectories();
+            DefaultDirectory[] defaultdirectories = new DefaultDirectory[directories.Length];
+            for (int i = 0; i < directories.Length; i++)
+            {
+                defaultdirectories[i] = new DefaultDirectory(directories[i]);
+            }
+            return defaultdirectories;
+        }
+
+        public DirectoryInfo Directory { get => directory; set => directory = value; }
+
+        public void Start()
+        {
+            for (int i = 1; i < directories.Length; i++)
+            {
+                if (directories[i].NameWithoutUUID == directories[i-1].NameWithoutUUID)
+                {
+                    if (directories[i-1].Files.Length == directories[i].Files.Length)
+                    {
+                        foreach (DefaultFile file in directories[i-1].Files)
+                        {
+                            foreach (DefaultFile fileInfo in directories[i].Files)
+                            {
+                                if (file.File.Name == fileInfo.File.Name)
+                                {
+                                    string Txt, Txt1;
+                                    Txt = file.FileRead();
+                                    Txt1 = file.FileRead();
+                                    if (Txt != Txt1)
+                                    {
+                                        break;
+                                    }
+                                    else
+                                    {
+                                        directories[i].DirectoryNeedToDelete();
+                                    }
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            for (int i = 0; i < directories.Length; i++)
+            {
+                directories[i].DirectoryRename();
+            }
+            for (int i = 1; i < files.Length; i++)
+            {
+                if (files[i].NameWithoutUUID == files[i-1].NameWithoutUUID)
+                {
+                    string Txt, Txt1;
+                    Txt = files[i].FileRead();
+                    Txt1 = files[i-1].FileRead();
+                    if (Txt == Txt1)
+                    {
+                        files[i].NeedToDelete = true;
+                    }
+                }
+            }
+            for (int i = 0; i < files.Length; i++)
+            {
+                files[i].FileRename();
+            }
+        }
+    }
+    class DefaultDirectory
+    {
+        DefaultFile[] files;
+        DirectoryInfo directory;
+        string nameWithoutUUID;
+        bool needToDelete;
+
+        public string NameWithoutUUID { get => nameWithoutUUID; set => nameWithoutUUID = value; }
+        internal DefaultFile[] Files { get => files; set => files = value; }
+        public DirectoryInfo Directory { get => directory; set => directory = value; }
+
+        public DefaultDirectory(DirectoryInfo Directory)
+        {
+            this.Directory = Directory;
+            Files = GetFiles(Directory);
+            Regex regex = new Regex(@" \w{8}-\w{4}-\w{4}-\w{4}-\w{12}");
+            NameWithoutUUID = regex.Replace(this.Directory.Name, "");
+        }
+        public DefaultFile[] GetFiles(DirectoryInfo directory)
+        {
+            FileInfo[] files = directory.GetFiles();
+            DefaultFile[] defaultFiles = new DefaultFile[files.Length];
+            for (int i = 0; i < files.Length; i++)
+            {
+                defaultFiles[i] = new DefaultFile(files[i]);
+            }
+            return defaultFiles;
+        }
+        public void DirectoryRename()
+        {
+            Regex regex = new Regex(Directory.Name);
+            string path = regex.Replace(Directory.FullName, "");
+            if (needToDelete != true)
+            {
+                int p = 1;
+                while (true)
+                {
+                    if (System.IO.Directory.Exists(path + "\\" + NameWithoutUUID) == false)
+                    {
+                        Directory.MoveTo(path + "\\" + NameWithoutUUID);
+                        break;
+                    }
+                    string temp;
+                    temp = NameWithoutUUID + "(" + p + ")";
+                    if (System.IO.Directory.Exists(path + "\\" + temp))
+                        p++;
+                    else
+                    {
+                        Directory.MoveTo(path + "\\" + temp);
+                        break;
+                    }
+                }
+            }
+            else
+                directory.Delete(true);
+        }
+        public void DirectoryNeedToDelete()
+        {
+            needToDelete = true;
+        }
+
+    }
+    class Program
+    {
         static void Main(string[] args)
         {
             string path;
@@ -51,143 +239,12 @@ namespace whites
                     break;
                 }
             }
-            DirectoryInfo directory = new DirectoryInfo(path);
-            Regex regex = new Regex(@" \w{8}-\w{4}-\w{4}-\w{4}-\w{12}");
-            if (directory.Exists)
-            {
-                DirectoryInfo[] directories = directory.GetDirectories();
-                string[] DirectoriesNameWithoutUUID = new string[directories.Length];
-                string[] DirectoriesName = new string[DirectoriesNameWithoutUUID.Length];
-                for (int i = 0; i < directories.Length; i++)
-                {
-                    DirectoriesNameWithoutUUID[i] = directories[i].Name;
-                    DirectoriesName[i] = directories[i].Name;
-                }
-                Array.Sort(DirectoriesNameWithoutUUID);
-                for (int i = 0; i < directories.Length; i++)
-                {
-
-                    DirectoriesNameWithoutUUID[i] = regex.Replace(directories[i].Name, "");
-                }
-                for (int i = 1; i < directories.Length; i++)
-                {
-                    if (DirectoriesNameWithoutUUID[i] == DirectoriesNameWithoutUUID[i - 1])
-                    {
-                        FileInfo[] filesInfo1 = directories[i].GetFiles();
-                        FileInfo[] fileInfo2 = directories[i - 1].GetFiles();
-                        if (fileInfo2.Length != filesInfo1.Length)
-                        {
-                            DirectoryRename(path, DirectoriesNameWithoutUUID[i], directories[i - 1], directories[i]);
-                        }
-                        else
-                        {
-                            foreach (FileInfo file in fileInfo2)
-                            {
-                                foreach (FileInfo fileInfo in filesInfo1)
-                                {
-                                    if (file.Name == fileInfo.Name)
-                                    {
-                                        string Txt, Txt1;
-                                        Txt = FileRead($"{path}\\{DirectoriesName[i - 1]}\\{file.Name}");
-                                        Txt1 = FileRead($"{path}\\{DirectoriesName[i]}\\{fileInfo.Name}");
-                                        if (Txt != Txt1)
-                                        {
-                                            DirectoryRename(path, DirectoriesNameWithoutUUID[i], directories[i - 1], directories[i]);
-                                            break;
-                                        }
-                                        else
-                                        {
-                                            directories[i - 1].MoveTo(path + "\\" + DirectoriesNameWithoutUUID[i]);
-                                            directories[i].Delete(true);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        DirectoryRename(path, DirectoriesNameWithoutUUID[i], directories[i - 1], directories[i]);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                directories = directory.GetDirectories();
-                DirectoriesNameWithoutUUID = new string[directories.Length];
-                for (int i = 0; i < directories.Length; i++)
-                {
-                    DirectoriesNameWithoutUUID[i] = directories[i].Name;
-                    DirectoriesNameWithoutUUID[i] = regex.Replace(directories[i].Name, "");
-                }
-                for (int i = 0; i < DirectoriesNameWithoutUUID.Length; i++)
-                {
-                    if (Directory.Exists(path + "\\" + DirectoriesNameWithoutUUID[i]) == false)
-                    {
-                        directories[i].MoveTo(path + "\\" + DirectoriesNameWithoutUUID[i]);
-                    }
-                }
-                FileInfo[] files = directory.GetFiles();
-                string[] FilesWithoutUUID = new string[files.Length];
-                string[] FilesName = new string[files.Length];
-                for (int i = 0; i < files.Length; i++)
-                {
-                    FilesName[i] = files[i].Name;
-                    FilesWithoutUUID[i] = files[i].Name;
-                }
-                Array.Sort(FilesWithoutUUID);
-                for (int i = 0; i < files.Length; i++)
-                {
-                    FilesWithoutUUID[i] = regex.Replace(files[i].Name, "");
-                }
-                for (int i = 1; i < files.Length; i++)
-                {
-                    if (FilesWithoutUUID[i] == FilesWithoutUUID[i - 1])
-                    {
-                        string Txt, Txt1;
-                        Txt = FileRead($"{path}\\{FilesName[i]}");
-                        Txt1 = FileRead($"{path}\\{FilesName[i - 1]}");
-                        if (Txt != Txt1)
-                        {
-                            int p = 1;
-                            files[i - 1].MoveTo(path + "\\" + FilesWithoutUUID[i]);
-                            while (true)
-                            {
-                                string filename;
-                                string[] FileAndItsExtension = FilesWithoutUUID[i].Split('.'); 
-                                filename = FileAndItsExtension[0];
-                                for (int j = 1; j < FileAndItsExtension.Length - 2; j++)
-                                {
-                                    filename = filename + " " + FileAndItsExtension[j];
-                                }
-                                filename = filename + " (" + p + ")." + FileAndItsExtension[FileAndItsExtension.Length - 1];
-                                if (Directory.Exists(path + "\\" + FilesWithoutUUID[i]))
-                                    p++;
-                                else
-                                {
-                                    FilesWithoutUUID[i] = filename;
-                                    files[i].MoveTo(path + "\\" + FilesWithoutUUID[i]);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                files = directory.GetFiles();
-                FilesWithoutUUID = new string[files.Length];
-                for (int i = 0; i < files.Length; i++)
-                {
-                    FilesWithoutUUID[i] = files[i].Name;
-                    FilesWithoutUUID[i] = regex.Replace(files[i].Name, "");
-                }
-                for (int i = 0; i < files.Length; i++)
-                {
-                    if (File.Exists(path + "\\" + FilesWithoutUUID[i]) == false)
-                    {
-                        files[i].MoveTo(path + "\\" + FilesWithoutUUID[i]);
-                    }
-                }
-                string compressionPath = directory.Parent.FullName + @"\Utrom's secrets.zip";
-                ZipFile.CreateFromDirectory(path, compressionPath);
-            }
+            MainDirectory directory = new MainDirectory(new DirectoryInfo(path));
+            directory.Start();
+            string compressionPath = directory.Directory.Parent.FullName + @"\Utrom's secrets.zip";
+            ZipFile.CreateFromDirectory(path, compressionPath);
         }
+    }
+}
     }
 }
